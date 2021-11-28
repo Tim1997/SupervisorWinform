@@ -49,50 +49,52 @@ namespace Supervisor.Helpers
 
                 File.Copy(_pChrome, _target);
 
-                SQLiteConnection connection = new SQLiteConnection
-                ("Data Source=" + _target + ";Version=3;New=False;Compress=True;");
-                connection.Open();
-
-                DataSet dataset = new DataSet();
-                SQLiteDataAdapter adapter = new SQLiteDataAdapter
-                ("select * from urls order by last_visit_time desc", connection);
-                adapter.Fill(dataset);
-
-                if (dataset != null && dataset.Tables.Count > 0 & dataset.Tables[0] != null)
+                using(SQLiteConnection connection = new SQLiteConnection("Data Source=" + _target + ";Version=3;New=False;Compress=True;"))
                 {
-                    DataTable dt = dataset.Tables[0];
+                    connection.BusyTimeout = 5000;
+                    connection.Open();
 
-                    var allHistoryItems = new List<HistoryItem>();
+                    DataSet dataset = new DataSet();
+                    SQLiteDataAdapter adapter = new SQLiteDataAdapter
+                    ("select * from urls order by last_visit_time desc", connection);
+                    adapter.Fill(dataset);
 
-                    foreach (DataRow historyRow in dt.Rows)
+                    if (dataset != null && dataset.Tables.Count > 0 & dataset.Tables[0] != null)
                     {
-                        HistoryItem historyItem = new HistoryItem()
+                        DataTable dt = dataset.Tables[0];
+
+                        var allHistoryItems = new List<HistoryItem>();
+
+                        foreach (DataRow historyRow in dt.Rows)
                         {
-                            URL = Convert.ToString(historyRow["url"]),
-                            Title = Convert.ToString(historyRow["title"])
-                        };
+                            HistoryItem historyItem = new HistoryItem()
+                            {
+                                URL = Convert.ToString(historyRow["url"]),
+                                Title = Convert.ToString(historyRow["title"])
+                            };
 
-                        // Chrome stores time elapsed since Jan 1, 1601 (UTC format) in microseconds
-                        long utcMicroSeconds = Convert.ToInt64(historyRow["last_visit_time"]);
+                            // Chrome stores time elapsed since Jan 1, 1601 (UTC format) in microseconds
+                            long utcMicroSeconds = Convert.ToInt64(historyRow["last_visit_time"]);
 
-                        // Windows file time UTC is in nanoseconds, so multiplying by 10
-                        DateTime gmtTime = DateTime.FromFileTimeUtc(10 * utcMicroSeconds);
+                            // Windows file time UTC is in nanoseconds, so multiplying by 10
+                            DateTime gmtTime = DateTime.FromFileTimeUtc(10 * utcMicroSeconds);
 
-                        // Converting to local time
-                        DateTime localTime = TimeZoneInfo.ConvertTimeFromUtc(gmtTime, TimeZoneInfo.Local);
+                            // Converting to local time
+                            DateTime localTime = TimeZoneInfo.ConvertTimeFromUtc(gmtTime, TimeZoneInfo.Local);
 
-                        if (localTime.Year < 2000) continue;
-                        historyItem.VisitedTime = localTime;
+                            if (localTime.Year < 2000) continue;
+                            historyItem.VisitedTime = localTime;
 
-                        allHistoryItems.Add(historyItem);
+                            allHistoryItems.Add(historyItem);
+                        }
+
+                        connection.Close();
+                        return Task.FromResult(allHistoryItems);
                     }
-                    connection.Close();
-                    return Task.FromResult(allHistoryItems);
                 }
-                connection.Close();
             }
             catch (Exception ex) {
-                
+                Debug.WriteLine(ex.Message);
             }
             return null;
         }

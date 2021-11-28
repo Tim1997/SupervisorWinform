@@ -220,14 +220,17 @@ namespace Supervisor
 
         private void LoadTabHistory()
         {
-            _ = LoadHistoryWebsite();
-            //SendFirebaseHistory();
+            //_ = LoadHistoryWebsite();
+            DeleteFirebaseHistory();
+            SendFirebaseHistory();
         }
 
         private void LoadTabSettings()
         {
             //LoadBlockList();
             //SubscriptionWebsite();
+            IniHelper.Write("auto", "True", "Startup");
+            RegistryHelper.SetStartup(true);
         }
 
         #endregion
@@ -286,6 +289,8 @@ namespace Supervisor
             {
                 tbPath.Text = browse.SelectedPath;
             }
+
+            IniHelper.Write("path", tbPath.Text,"Screenshot");
         }
 
         private void btnSave_Click(object sender, EventArgs ea)
@@ -320,7 +325,7 @@ namespace Supervisor
             }
             else if (cbClock.Checked)
             {
-                IniHelper.Write("typetime", dtpTimeClock.Value.ToLongTimeString(), "Time");
+                IniHelper.Write("typetime", dtpTimeClock.Value.ToString("HH:mm:ss"), "Time");
                 IniHelper.Write("type", cbClock.Text, "Time");
             }
             else IniHelper.DeleteKey("type", "Time");
@@ -454,7 +459,7 @@ namespace Supervisor
             else if (type == cbClock.Text)
             {
                 var typetime = IniHelper.Read("typetime", "Time");
-                dtpTimeClock.Value = DateTime.ParseExact(typetime, "hh:mm:ss tt", CultureInfo.InvariantCulture);
+                dtpTimeClock.Value = DateTime.ParseExact(typetime, "HH:mm:ss", CultureInfo.InvariantCulture);
                 cbClock.Checked = true;
             }
         }
@@ -600,6 +605,20 @@ namespace Supervisor
                       .Child("Historys")
                       .PostAsync(json);
                 }
+
+                if (history == null) return;
+                lvHistory.Items.Clear();
+                Histories?.Clear();
+
+                foreach (var web in history)
+                {
+                    if (string.IsNullOrEmpty(web.Title)) continue;
+
+                    Histories.Add(web);
+
+                    var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
+                    lvHistory.Items.Add(item);
+                }
             }
         }
 
@@ -638,7 +657,7 @@ namespace Supervisor
                             IniHelper.Write("type", timer.IsClock ? "Clock" : "Countdown", "Time");
                             
                             if(timer.IsClock)
-                                IniHelper.Write("typetime", timer.Clock.ToString("hh:mm:ss tt"), "Time");
+                                IniHelper.Write("typetime", timer.Clock.ToString(), "Time");
                             else
                                 IniHelper.Write("typetime", timer.Minute.ToString(), "Time");
                             
@@ -735,18 +754,17 @@ namespace Supervisor
                                     if (website == null) return;
 
                                     //add view
-                                    BlockWebsites.Remove(website.Url);
-                                    foreach (ListViewItem item in lvBlockWebsite.Items)
+                                    this.Invoke(new Action(() =>
                                     {
-                                        if (item.Text == website.Url)
+                                        foreach (ListViewItem item in lvBlockWebsite.Items)
                                         {
-                                            this.Invoke(new Action(() =>
+                                            if (item.Text == website.Url)
                                             {
                                                 lvBlockWebsite.Items.Remove(item);
-                                            }));
+                                            }
                                         }
-                                    }
-
+                                    }));
+                                    BlockWebsites.Remove(website.Url);
                                     WriteWebsite();
                                 }
                                 break;
