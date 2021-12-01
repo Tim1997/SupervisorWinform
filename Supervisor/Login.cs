@@ -1,6 +1,7 @@
 ﻿using Firebase.Auth;
 using Newtonsoft.Json;
 using Supervisor.Helpers;
+using Supervisor.Models;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,13 +16,12 @@ namespace Supervisor
 {
     public partial class Login : Form
     {
-        protected readonly FirebaseAuthProvider FirebaseAuth;
-        private string webAPIkey = "AIzaSyApIY-Eo7vVosS24J_sJMRdx9oo42wt16g";
+        protected readonly FirebaseAuthProvider FirebaseAuth = new FirebaseAuthProvider(new FirebaseConfig(webAPIkey));
+        private static readonly string webAPIkey = "AIzaSyApIY-Eo7vVosS24J_sJMRdx9oo42wt16g";
         private IniHelper IniHelper;
         public Login()
         {
             InitializeComponent();
-            FirebaseAuth = new FirebaseAuthProvider(new FirebaseConfig(webAPIkey));
             IniHelper = new IniHelper();
         }
 
@@ -66,9 +66,15 @@ namespace Supervisor
                     }
                 }
             }
-            catch (Exception ex)
+            catch (FirebaseAuthException ex)
             {
-                MessageBox.Show("User does not exist", "Error");
+                if (ex.ResponseData == "N/A")
+                    MessageBox.Show("Internet connection error", "Error");
+                else
+                {
+                    var response = JsonConvert.DeserializeObject<ResponseFirebase>(ex.ResponseData);
+                    MessageBox.Show(response.error.message, "Error");
+                }
             }
         }
     }

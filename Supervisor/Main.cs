@@ -47,6 +47,7 @@ namespace Supervisor
         private static IniHelper IniHelper;
         private static int _timeScreenshot;
         private static int _seconds;
+        private BrowerHelper _browerHelper;
         #endregion
 
         #region Init
@@ -61,6 +62,7 @@ namespace Supervisor
             Histories = new List<HistoryItem>();
             BlockWebsites = new List<string>();
             IniHelper = new IniHelper();
+            _browerHelper = new BrowerHelper();
 
             ContextMenu menu = new ContextMenu();
             menu.MenuItems.Add("Exit", ContextMenuExit);
@@ -107,7 +109,6 @@ namespace Supervisor
             LoadData();
             BackgroundTask();
             //////////////////////////////////////
-            LoadTabHistory();
         }
 
         private void lvHistory_ColumnClick(object sender, ColumnClickEventArgs e)
@@ -128,9 +129,9 @@ namespace Supervisor
             lvHistory.Sort();
         }
 
-        private void btnRefresh_Click(object sender, EventArgs e)
+        private async void btnRefresh_Click(object sender, EventArgs e)
         {
-            _ = LoadHistoryWebsite();
+            await LoadHistoryWebsite();
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -183,7 +184,6 @@ namespace Supervisor
 
             if (tab.Text == "Web History" && _isSettingsTab)
             {
-                LoadTabHistory();
                 _isSettingsTab = !_isSettingsTab;
             }
             else if (tab.Text == "Settings" && !_isSettingsTab)
@@ -206,28 +206,53 @@ namespace Supervisor
 
         private async Task LoadHistoryWebsite()
         {
-            var history = await BrowerHelper.GetHistoryChrome();
+            _browerHelper.Connect(@"C:\Temp\temp");
+            var historys = await _browerHelper.GetHistoryChrome();
 
-            if (history == null) return;
-            lvHistory.Items.Clear();
-            Histories?.Clear();
-
-            foreach (var web in history)
-            {
-                if (string.IsNullOrEmpty(web.Title)) continue;
-
-                Histories.Add(web);
-
-                var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
-                lvHistory.Items.Add(item);
-            }
+            AddHistory(historys);
         }
 
-        private void LoadTabHistory()
+        private void AddHistory(List<HistoryItem> histories)
         {
-            //_ = LoadHistoryWebsite();
-            DeleteFirebaseHistory();
-            SendFirebaseHistory();
+            if (histories == null) return;
+
+            try
+            {
+                if (Histories.Count != 0)
+                {
+                    foreach (var web in histories)
+                    {
+                        if (string.IsNullOrEmpty(web.Title)) continue;
+                        if (Histories.Any(x => x.VisitedTime >= web.VisitedTime)) continue;
+
+                        Histories.Add(web);
+
+                        var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
+                        lvHistory.Items.Add(item);
+
+                        SendFirebaseHistory(web);
+                    }
+                }
+                else
+                {
+                    Histories = histories.TakeWhile(x => x.VisitedTime.Date == DateTime.Now.Date
+                                                        || x.VisitedTime.Date == DateTime.Now.Date.AddDays(-1)
+                                                        || x.VisitedTime.Date == DateTime.Now.Date.AddDays(-2))
+                        .ToList().Take(50).ToList();
+
+                    foreach (var web in Histories)
+                    {
+                        var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
+                        lvHistory.Items.Add(item);
+                    }
+
+                    SendFirebaseHistory(Histories);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
         }
 
         private void LoadTabSettings()
@@ -310,21 +335,33 @@ namespace Supervisor
             if (_timeScreenshot != 0)
                 TimerHelper.Run(_timeScreenshot, async (s, e) =>
                 {
-                    var bitmap = CommonHelper.TakeScreenshot(tbPath.Text);
-                    var stream = new System.IO.MemoryStream();
-                    bitmap.Save(stream, null);
+                    var imagepath = CommonHelper.TakeScreenshot(tbPath.Text);
+                    Debug.WriteLine("take screenshot");
 
                     var token = IniHelper.Read("Token");
-                    if(token != null)
+                    if (token != null)
                     {
-                        var imageurl = await FirebaseStorage.Child(token).Child("Screenshots").PutAsync(stream);
-                        await FirebaseDatabase.Child(token).Child("Images").PostAsync(new ImageView
+                        try
                         {
-                            Id = Guid.NewGuid().ToString(),
-                            ImageName = DateTime.Now.ToString("HHmmss"),
-                            ImageUrl = imageurl,
-                            UploadTime = DateTime.Now,
-                        });
+                            var namefile = Path.GetFileNameWithoutExtension(imagepath);
+                            var imageurl = await FirebaseStorage.Child(token).Child("Screenshots")
+                            .Child(namefile)
+                            .PutAsync(File.OpenRead(imagepath));
+
+                            await FirebaseDatabase.Child(token).Child("Images").PostAsync(new ImageView
+                            {
+                                Id = Guid.NewGuid().ToString(),
+                                ImageName = namefile,
+                                ImageUrl = imageurl,
+                                UploadTime = DateTime.Now,
+                            });
+
+                            Debug.WriteLine("push screenshot");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
                     }
                 });
 
@@ -391,7 +428,12 @@ namespace Supervisor
                             rbOneTime.Checked = false;
 
                         await ShowToastAsync("Information", new[] { "Your computer will be shutdown" });
-                        Process.Start("shutdown", "/s /t 0");
+                        var psi = new ProcessStartInfo("shutdown", "/s /t 0");
+                        psi.CreateNoWindow = true;
+                        psi.UseShellExecute = false;
+                        psi.Verb = "runas";
+                        Process.Start(psi);
+
                         return;
                     }
 
@@ -427,7 +469,7 @@ namespace Supervisor
         #endregion
 
         #region Method Settings
-        private void LoadData()
+        private async void LoadData()
         {
             LoadDataScreenshot();
 
@@ -436,6 +478,28 @@ namespace Supervisor
             if (!string.IsNullOrEmpty(auto))
             {
                 cbAutostart.Checked = bool.Parse(auto);
+            }
+
+            //load history
+            Histories?.Clear();
+            var token = IniHelper.Read("Token");
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                Histories = (await FirebaseDatabase
+                  .Child(token)
+                  .Child("Historys")
+                  .OnceAsync<HistoryItem>()).Select(historyItem => new HistoryItem
+                  {
+                      Title = historyItem.Object.Title,
+                      URL = historyItem.Object.URL,
+                      VisitedTime = historyItem.Object.VisitedTime,
+                  }).ToList();
+
+                foreach (var web in Histories)
+                {
+                    var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
+                    lvHistory.Items.Add(item);
+                }
             }
 
             LoadDataTimer();
@@ -490,14 +554,13 @@ namespace Supervisor
 
         private void BackgroundTask()
         {
-            if (_timeScreenshot != 0)
-                TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(tbPath.Text));
-
             BackgroundSendDataTask();
             SubscriptionTimer();
             SubscriptionScreenshot();
             SubscriptionWebsite();
+
             btnSetup_Click(null, null);
+            btnSave_Click(null, null);
         }
 
         private void LoadBlockList()
@@ -566,6 +629,7 @@ namespace Supervisor
         #region Notify Icon
         private void ContextMenuShow(object sender, EventArgs e)
         {
+            this.Hide();
             var login = new Login();
             if (login.ShowDialog() == DialogResult.OK)
             {
@@ -576,6 +640,7 @@ namespace Supervisor
 
         private void ContextMenuExit(object sender, EventArgs e)
         {
+            this.Hide();
             var login = new Login();
             if (login.ShowDialog() == DialogResult.OK)
             {
@@ -601,27 +666,27 @@ namespace Supervisor
         #endregion
 
         #region Firebase
-        private void BackgroundSendDataTask(int count = 30)
+        private void BackgroundSendDataTask(int count = 1)
         {
             var timer = new Timer();
             timer.Interval = 60 * 1000 * count;
             timer.Enabled = true;
-            timer.Tick += (s, e) =>
+            timer.Tick += async (s, e) =>
             {
-                DeleteFirebaseHistory();
-                SendFirebaseHistory();
+                await LoadHistoryWebsite();
+                Debug.WriteLine("Push history");
             };
             timer.Start();
         }
 
-        private async void SendFirebaseHistory()
+        private async void SendFirebaseHistory(List<HistoryItem> histories)
         {
             var token = IniHelper.Read("Token");
             if (!string.IsNullOrWhiteSpace(token))
             {
-                var history = await BrowerHelper.GetHistoryChrome();
-                history = history.TakeWhile(x => x.VisitedTime.Date == DateTime.Now.Date).ToList().Take(50).ToList();
-                foreach (var item in history)
+                if (histories == null) return;
+
+                foreach (var item in histories)
                 {
                     var json = JsonConvert.SerializeObject(item);
                     await FirebaseDatabase
@@ -629,20 +694,21 @@ namespace Supervisor
                       .Child("Historys")
                       .PostAsync(json);
                 }
+            }
+        }
 
+        private async void SendFirebaseHistory(HistoryItem history)
+        {
+            var token = IniHelper.Read("Token");
+            if (!string.IsNullOrWhiteSpace(token))
+            {
                 if (history == null) return;
-                lvHistory.Items.Clear();
-                Histories?.Clear();
 
-                foreach (var web in history)
-                {
-                    if (string.IsNullOrEmpty(web.Title)) continue;
-
-                    Histories.Add(web);
-
-                    var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
-                    lvHistory.Items.Add(item);
-                }
+                var json = JsonConvert.SerializeObject(history);
+                await FirebaseDatabase
+                  .Child(token)
+                  .Child("Historys")
+                  .PostAsync(json);
             }
         }
 
@@ -688,7 +754,7 @@ namespace Supervisor
                             this.Invoke(new Action(() =>
                             {
                                 LoadDataTimer();
-                                btnSetup.PerformClick();
+                                btnSetup_Click(null, null);
                             }));
                         }
                         break;
@@ -728,7 +794,7 @@ namespace Supervisor
                                     this.Invoke(new Action(() =>
                                     {
                                         LoadDataScreenshot();
-                                        btnSave.PerformClick();
+                                        btnSave_Click(null, null);
                                     }));
                                 }
                                 break;

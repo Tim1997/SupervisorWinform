@@ -13,7 +13,7 @@ namespace Supervisor.Helpers
 {
     public class CommonHelper
     {
-        public static Bitmap TakeScreenshot(string path)
+        public static string TakeScreenshot(string path)
         {
             path = path + "\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
             if (!Directory.Exists(path))
@@ -37,9 +37,9 @@ namespace Supervisor.Helpers
                 try
                 {
                     bitmap.Save(uniqueFileName, ImageFormat.Png);
-                    return bitmap;
+                    return uniqueFileName;
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     return null;
                 }

@@ -253,6 +253,7 @@
     </Compile>
     <Compile Include="Models\HistoryItem.cs" />
     <Compile Include="Models\ImageVIew.cs" />
+    <Compile Include="Models\ResponseFirebase.cs" />
     <Compile Include="Models\ScreenshotView.cs" />
     <Compile Include="Models\TimerView.cs" />
     <Compile Include="Models\WebsiteView.cs" />
