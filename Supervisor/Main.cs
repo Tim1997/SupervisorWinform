@@ -393,6 +393,8 @@ namespace Supervisor
             catch (Exception)
             { }
 
+            if (sender != null) return;
+
             if (_timeScreenshot != 0)
                 TimerHelper.Run(_timeScreenshot, async (s, e) =>
                 {
