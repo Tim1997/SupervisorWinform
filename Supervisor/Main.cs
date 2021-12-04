@@ -266,47 +266,82 @@ namespace Supervisor
         #endregion
 
         #region Event Settings
-        private void btnAdd_Click(object sender, EventArgs e)
+        private async void btnAdd_Click(object sender, EventArgs e)
         {
             var dialog = new DialogBlockWebsite("Add website");
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                BlockWebsites?.Add(dialog.Website);
-                lvBlockWebsite.Items.Add(dialog.Website);
+                var token = IniHelper.Read("Token");
+                if (!string.IsNullOrEmpty(token))
+                {
+                    try
+                    {
+                        await FirebaseDatabase.Child(token).Child("Websites").PostAsync(new WebView { Url = dialog.Website });
+                        if (BlockWebsites?.Exists(x => x == dialog.Website) == false)
+                        {
+                            BlockWebsites?.Add(dialog.Website);
+                            lvBlockWebsite.Items.Add(dialog.Website);
+                        }
+                        
+                    }
+                    catch (Exception)
+                    {}
+                }
 
-                WriteWebsite();
+                //WriteWebsite();
             }
         }
 
-        private void btnEdit_Click(object sender, EventArgs e)
+        private async void btnEdit_Click(object sender, EventArgs e)
         {
             var itemsselected = lvBlockWebsite.SelectedItems;
             if (itemsselected.Count == 0) return;
 
-            var dialog = new DialogBlockWebsite("Edit website", itemsselected[0].Text);
-            if (dialog.ShowDialog() == DialogResult.OK)
+            var token = IniHelper.Read("Token");
+            FirebaseObject<WebView> webView = null; 
+            try
             {
-                var index = BlockWebsites.FindIndex(x => x == itemsselected[0].Text);
-                BlockWebsites.RemoveAt(index);
-                BlockWebsites.Insert(index, dialog.Website);
-                itemsselected[0].Text = dialog.Website;
+                webView = (await FirebaseDatabase.Child(token).Child("Websites").OnceAsync<WebView>()).FirstOrDefault(x => x.Object.Url == itemsselected[0].Text);
 
-                WriteWebsite();
+                var dialog = new DialogBlockWebsite("Edit website", itemsselected[0].Text);
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    var index = BlockWebsites.FindIndex(x => x == itemsselected[0].Text);
+                    BlockWebsites.RemoveAt(index);
+                    BlockWebsites.Insert(index, dialog.Website);
+                    itemsselected[0].Text = dialog.Website;
+
+                    webView.Object.Url = dialog.Website;
+                    await FirebaseDatabase.Child(token).Child("Websites").Child(webView.Key).PutAsync(webView.Object);
+                    WriteWebsite();
+                }
             }
+            catch (Exception)
+            { }
         }
 
-        private void btnDelete_Click(object sender, EventArgs e)
+        private async void btnDelete_Click(object sender, EventArgs e)
         {
             var itemsselected = lvBlockWebsite.SelectedItems;
             if (itemsselected.Count == 0) return;
 
-            foreach (ListViewItem web in itemsselected)
+            var token = IniHelper.Read("Token");
+            try
             {
-                lvBlockWebsite.Items.Remove(web);
-                BlockWebsites?.Remove(web.Text);
+                foreach (ListViewItem web in itemsselected)
+                {
+                    var webView = (await FirebaseDatabase.Child(token).Child("Websites").OnceAsync<WebView>()).FirstOrDefault(x => x.Object.Url == itemsselected[0].Text);
+                    await FirebaseDatabase.Child(token).Child("Websites").Child(webView.Key).DeleteAsync();
 
-                WriteWebsite();
+                    lvBlockWebsite.Items.Remove(web);
+                    BlockWebsites?.Remove(web.Text);
+
+                    //WriteWebsite();
+                }
             }
+            catch (Exception)
+            { }
+            
         }
 
         private void btnBrowse_Click(object sender, EventArgs e)
@@ -323,7 +358,7 @@ namespace Supervisor
             IniHelper.Write("path", tbPath.Text, "Screenshot");
         }
 
-        private void btnSave_Click(object sender, EventArgs ea)
+        private async void btnSave_Click(object sender, EventArgs ea)
         {
             TimerHelper.Close();
 
@@ -331,6 +366,32 @@ namespace Supervisor
             else if (rb5min.Checked) _timeScreenshot = 5;
             else if (rb15min.Checked) _timeScreenshot = 15;
             else if (rb30min.Checked) _timeScreenshot = 30;
+
+            try
+            {
+                var token = IniHelper.Read("Token");
+                var email = IniHelper.Read("Email");
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    var screenshot = (await FirebaseDatabase.Child(token).Child("Screenshot").OnceAsync<ScreenshotView>()).FirstOrDefault(x => x.Object.Email == email);
+                    var screenshotview = new ScreenshotView
+                    {
+                        Email = email,
+                        Time = _timeScreenshot,
+                    };
+                    if (screenshot == null)
+                    {
+                        await FirebaseDatabase.Child(token).Child("Screenshot").PostAsync(screenshotview);
+                    }
+                    else
+                    {
+                        await FirebaseDatabase.Child(token).Child("Screenshot").Child(screenshot.Key).PutAsync(screenshotview);
+                    }
+                }
+            }
+            catch (Exception)
+            { }
 
             if (_timeScreenshot != 0)
                 TimerHelper.Run(_timeScreenshot, async (s, e) =>
@@ -374,7 +435,7 @@ namespace Supervisor
             RegistryHelper.SetStartup(cbAutostart.Checked);
         }
 
-        private void btnSetup_Click(object sender, EventArgs e)
+        private async void btnSetup_Click(object sender, EventArgs e)
         {
             TimerHelper.CloseCountdown();
 
@@ -397,6 +458,40 @@ namespace Supervisor
 
             if (rbOneTime.Checked || rbEveryday.Checked)
             {
+                #region Update data
+
+                try
+                {
+                    var token = IniHelper.Read("Token");
+                    var email = IniHelper.Read("Email");
+
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        var timer = (await FirebaseDatabase.Child(token).Child("Timer").OnceAsync<TimerView>()).FirstOrDefault(x => x.Object.Email == email);
+                        var timerview = new TimerView
+                        {
+                            Email = email,
+                            Clock = dtpTimeClock.Value.TimeOfDay,
+                            IsClock = cbClock.Checked,
+                            IsOnce = rbOneTime.Checked,
+                            Minute = (int)nCountdown.Value,
+                        };
+                        if(timer == null)
+                        {
+                            await FirebaseDatabase.Child(token).Child("Timer").PostAsync(timerview);
+                        }
+                        else
+                        {
+                            await FirebaseDatabase.Child(token).Child("Timer").Child(timer.Key).PutAsync(timerview);
+                        }
+                    }
+                }
+                catch (Exception)
+                {}
+
+                #endregion
+                if (sender != null) return;
+
                 _seconds = 0;
                 if (cbClock.Checked)
                 {
@@ -444,17 +539,26 @@ namespace Supervisor
 
         }
 
-        private void btnClear_Click(object sender, EventArgs e)
+        private async void btnClear_Click(object sender, EventArgs e)
         {
-            IniHelper.DeleteSection("Time");
+            try
+            {
+                var token = IniHelper.Read("Token");
+                await FirebaseDatabase.Child(token).Child("Timer").DeleteAsync();
 
-            cbClock.Checked = false;
-            cbCountdown.Checked = false;
-            rbEveryday.Checked = false;
-            rbOneTime.Checked = false;
+                IniHelper.DeleteSection("Time");
+                cbClock.Checked = false;
+                cbCountdown.Checked = false;
+                rbEveryday.Checked = false;
+                rbOneTime.Checked = false;
 
-            lbTimeRemaining.Text = "00:00:00";
-            TimerHelper.CloseCountdown();
+                lbTimeRemaining.Text = "00:00:00";
+                TimerHelper.CloseCountdown();
+            }
+            catch (Exception)
+            {
+            }
+            
         }
         private void cbCountdown_CheckedChanged(object sender, EventArgs e)
         {
@@ -588,9 +692,31 @@ namespace Supervisor
                 }
             }
         }
+        public static bool IsFileLocked(FileInfo file)
+        {
+            FileStream stream = null;
 
+            try
+            {
+                stream = file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                return true;
+            }
+            finally
+            {
+                if (stream != null)
+                    stream.Close();
+            }
+            return false;
+        }
         private void WriteWebsite()
         {
+            while (IsFileLocked(new FileInfo(_pHost)))
+            {
+                Task.Delay(1000);
+            }
             using (StreamWriter writer = new StreamWriter(_pHost))
             {
                 foreach (var web in BlockWebsites)

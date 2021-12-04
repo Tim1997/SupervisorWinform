@@ -257,6 +257,7 @@
     <Compile Include="Models\ScreenshotView.cs" />
     <Compile Include="Models\TimerView.cs" />
     <Compile Include="Models\WebsiteView.cs" />
+    <Compile Include="Models\WebView.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <EmbeddedResource Include="DialogBlockWebsite.resx">
