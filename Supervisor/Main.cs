@@ -206,10 +206,16 @@ namespace Supervisor
 
         private async Task LoadHistoryWebsite()
         {
-            _browerHelper.Connect(@"C:\Temp\temp");
-            var historys = await _browerHelper.GetHistoryChrome();
+            try
+            {
+                _browerHelper.Connect(@"C:\Temp\temp");
+                var historys = await _browerHelper.GetHistoryChrome();
 
-            AddHistory(historys);
+                AddHistory(historys);
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private void AddHistory(List<HistoryItem> histories)
@@ -579,33 +585,39 @@ namespace Supervisor
         {
             LoadDataScreenshot();
 
-            //Startup
-            var auto = IniHelper.Read("auto", "Startup");
-            if (!string.IsNullOrEmpty(auto))
+            try
             {
-                cbAutostart.Checked = bool.Parse(auto);
-            }
-
-            //load history
-            Histories?.Clear();
-            var token = IniHelper.Read("Token");
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                Histories = (await FirebaseDatabase
-                  .Child(token)
-                  .Child("Historys")
-                  .OnceAsync<HistoryItem>()).Select(historyItem => new HistoryItem
-                  {
-                      Title = historyItem.Object.Title,
-                      URL = historyItem.Object.URL,
-                      VisitedTime = historyItem.Object.VisitedTime,
-                  }).ToList();
-
-                foreach (var web in Histories)
+                //Startup
+                var auto = IniHelper.Read("auto", "Startup");
+                if (!string.IsNullOrEmpty(auto))
                 {
-                    var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
-                    lvHistory.Items.Add(item);
+                    cbAutostart.Checked = bool.Parse(auto);
                 }
+
+                //load history
+                Histories?.Clear();
+                var token = IniHelper.Read("Token");
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    Histories = (await FirebaseDatabase
+                      .Child(token)
+                      .Child("Historys")
+                      .OnceAsync<HistoryItem>()).Select(historyItem => new HistoryItem
+                      {
+                          Title = historyItem.Object.Title,
+                          URL = historyItem.Object.URL,
+                          VisitedTime = historyItem.Object.VisitedTime,
+                      }).ToList();
+
+                    foreach (var web in Histories)
+                    {
+                        var item = new ListViewItem(new string[] { web.Title, web.URL, web.VisitedTime.ToString() });
+                        lvHistory.Items.Add(item);
+                    }
+                }
+            }
+            catch (Exception)
+            {
             }
 
             LoadDataTimer();
@@ -809,34 +821,46 @@ namespace Supervisor
 
         private async void SendFirebaseHistory(List<HistoryItem> histories)
         {
-            var token = IniHelper.Read("Token");
-            if (!string.IsNullOrWhiteSpace(token))
+            try
             {
-                if (histories == null) return;
-
-                foreach (var item in histories)
+                var token = IniHelper.Read("Token");
+                if (!string.IsNullOrWhiteSpace(token))
                 {
-                    var json = JsonConvert.SerializeObject(item);
+                    if (histories == null) return;
+
+                    foreach (var item in histories)
+                    {
+                        var json = JsonConvert.SerializeObject(item);
+                        await FirebaseDatabase
+                          .Child(token)
+                          .Child("Historys")
+                          .PostAsync(json);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        private async void SendFirebaseHistory(HistoryItem history)
+        {
+            try
+            {
+                var token = IniHelper.Read("Token");
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    if (history == null) return;
+
+                    var json = JsonConvert.SerializeObject(history);
                     await FirebaseDatabase
                       .Child(token)
                       .Child("Historys")
                       .PostAsync(json);
                 }
             }
-        }
-
-        private async void SendFirebaseHistory(HistoryItem history)
-        {
-            var token = IniHelper.Read("Token");
-            if (!string.IsNullOrWhiteSpace(token))
+            catch (Exception)
             {
-                if (history == null) return;
-
-                var json = JsonConvert.SerializeObject(history);
-                await FirebaseDatabase
-                  .Child(token)
-                  .Child("Historys")
-                  .PostAsync(json);
             }
         }
 
@@ -854,143 +878,161 @@ namespace Supervisor
 
         private void SubscriptionTimer()
         {
-            var token = IniHelper.Read("Token");
-            var email = IniHelper.Read("Email");
-
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
-                return;
-
-            var result = FirebaseDatabase.Child(token)
-                    .Child("Timer")
-                    .AsObservable<TimerView>().Subscribe(evt =>
+            try
             {
-                switch (evt.EventType)
-                {
-                    case Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate:
+                var token = IniHelper.Read("Token");
+                var email = IniHelper.Read("Email");
+
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+                    return;
+
+                var result = FirebaseDatabase.Child(token)
+                        .Child("Timer")
+                        .AsObservable<TimerView>().Subscribe(evt =>
                         {
-                            var timer = evt.Object;
-                            if (timer == null) return;
-
-                            IniHelper.Write("loop", (!timer.IsOnce).ToString(), "Time");
-                            IniHelper.Write("type", timer.IsClock ? "Clock" : "Countdown", "Time");
-
-                            if (timer.IsClock)
-                                IniHelper.Write("typetime", timer.Clock.ToString(), "Time");
-                            else
-                                IniHelper.Write("typetime", timer.Minute.ToString(), "Time");
-
-                            this.Invoke(new Action(() =>
+                            switch (evt.EventType)
                             {
-                                LoadDataTimer();
-                                btnSetup_Click(null, null);
-                            }));
-                        }
-                        break;
-                    case Firebase.Database.Streaming.FirebaseEventType.Delete:
-                        break;
-                    default:
-                        break;
-                }
-            });
+                                case Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate:
+                                    {
+                                        var timer = evt.Object;
+                                        if (timer == null) return;
+
+                                        IniHelper.Write("loop", (!timer.IsOnce).ToString(), "Time");
+                                        IniHelper.Write("type", timer.IsClock ? "Clock" : "Countdown", "Time");
+
+                                        if (timer.IsClock)
+                                            IniHelper.Write("typetime", timer.Clock.ToString(), "Time");
+                                        else
+                                            IniHelper.Write("typetime", timer.Minute.ToString(), "Time");
+
+                                        this.Invoke(new Action(() =>
+                                        {
+                                            LoadDataTimer();
+                                            btnSetup_Click(null, null);
+                                        }));
+                                    }
+                                    break;
+                                case Firebase.Database.Streaming.FirebaseEventType.Delete:
+                                    break;
+                                default:
+                                    break;
+                            }
+                        });
+            }
+            catch (Exception)
+            {
+            }
 
         }
 
         private void SubscriptionScreenshot()
         {
-            var token = IniHelper.Read("Token");
-            var email = IniHelper.Read("Email");
+            try
+            {
+                var token = IniHelper.Read("Token");
+                var email = IniHelper.Read("Email");
 
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
-                return;
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+                    return;
 
-            var result = FirebaseDatabase.Child(token)
-                    .Child("Screenshot")
-                    .AsObservable<ScreenshotView>().Subscribe(evt =>
-                    {
-                        switch (evt.EventType)
+                var result = FirebaseDatabase.Child(token)
+                        .Child("Screenshot")
+                        .AsObservable<ScreenshotView>().Subscribe(evt =>
                         {
-                            case Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate:
-                                {
-                                    var screenshot = evt.Object;
-                                    if (screenshot == null) return;
-
-                                    var old = IniHelper.Read("time", "Screenshot");
-                                    if (int.Parse(old) == screenshot.Time)
-                                        return;
-
-                                    IniHelper.Write("time", screenshot.Time.ToString(), "Screenshot");
-                                    this.Invoke(new Action(() =>
+                            switch (evt.EventType)
+                            {
+                                case Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate:
                                     {
-                                        LoadDataScreenshot();
-                                        btnSave_Click(null, null);
-                                    }));
-                                }
-                                break;
-                            case Firebase.Database.Streaming.FirebaseEventType.Delete:
-                                break;
-                            default:
-                                break;
-                        }
-                    });
+                                        var screenshot = evt.Object;
+                                        if (screenshot == null) return;
+
+                                        var old = IniHelper.Read("time", "Screenshot");
+                                        if (int.Parse(old) == screenshot.Time)
+                                            return;
+
+                                        IniHelper.Write("time", screenshot.Time.ToString(), "Screenshot");
+                                        this.Invoke(new Action(() =>
+                                        {
+                                            LoadDataScreenshot();
+                                            btnSave_Click(null, null);
+                                        }));
+                                    }
+                                    break;
+                                case Firebase.Database.Streaming.FirebaseEventType.Delete:
+                                    break;
+                                default:
+                                    break;
+                            }
+                        });
+            }
+            catch (Exception)
+            {
+            }
         }
 
         private void SubscriptionWebsite()
         {
-            var token = IniHelper.Read("Token");
-            var email = IniHelper.Read("Email");
+            try
+            {
+                var token = IniHelper.Read("Token");
+                var email = IniHelper.Read("Email");
 
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
-                return;
+                if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(token))
+                    return;
 
-            var result = FirebaseDatabase.Child(token)
-                    .Child("Websites")
-                    .AsObservable<WebsiteView>().Subscribe(evt =>
-                    {
-                        switch (evt.EventType)
+                var result = FirebaseDatabase.Child(token)
+                        .Child("Websites")
+                        .AsObservable<WebsiteView>().Subscribe(evt =>
                         {
-                            case Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate:
-                                {
-                                    var website = evt.Object;
-                                    if (website == null) return;
-
-                                    if (BlockWebsites?.Exists(x => x == website.Url) == false)
+                            switch (evt.EventType)
+                            {
+                                case Firebase.Database.Streaming.FirebaseEventType.InsertOrUpdate:
                                     {
+                                        var website = evt.Object;
+                                        if (website == null) return;
+
+                                        if (BlockWebsites?.Exists(x => x == website.Url) == false)
+                                        {
                                         //add view
                                         BlockWebsites.Add(website.Url);
-                                        this.Invoke(new Action(() =>
-                                        {
-                                            lvBlockWebsite.Items.Add(website.Url);
-                                        }));
+                                            this.Invoke(new Action(() =>
+                                            {
+                                                lvBlockWebsite.Items.Add(website.Url);
+                                            }));
 
-                                        WriteWebsite();
+                                            WriteWebsite();
+                                        }
                                     }
-                                }
-                                break;
-                            case Firebase.Database.Streaming.FirebaseEventType.Delete:
-                                {
-                                    var website = evt.Object;
-                                    if (website == null) return;
+                                    break;
+                                case Firebase.Database.Streaming.FirebaseEventType.Delete:
+                                    {
+                                        var website = evt.Object;
+                                        if (website == null) return;
 
                                     //add view
                                     this.Invoke(new Action(() =>
-                                    {
-                                        foreach (ListViewItem item in lvBlockWebsite.Items)
                                         {
-                                            if (item.Text == website.Url)
+                                            foreach (ListViewItem item in lvBlockWebsite.Items)
                                             {
-                                                lvBlockWebsite.Items.Remove(item);
+                                                if (item.Text == website.Url)
+                                                {
+                                                    lvBlockWebsite.Items.Remove(item);
+                                                }
                                             }
-                                        }
-                                    }));
-                                    BlockWebsites.Remove(website.Url);
-                                    WriteWebsite();
-                                }
-                                break;
-                            default:
-                                break;
-                        }
+                                        }));
+                                        BlockWebsites.Remove(website.Url);
+                                        WriteWebsite();
+                                    }
+                                    break;
+                                default:
+                                    break;
+                            }
 
-                    });
+                        });
+            }
+            catch (Exception)
+            {
+            }
         }
         #endregion
     }
