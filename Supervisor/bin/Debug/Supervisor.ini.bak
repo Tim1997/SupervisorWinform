@@ -5,9 +5,10 @@ path=F:\Trash
 auto=True
 
 [Time]
-loop=true
+loop=True
+type=Countdown
 typetime=0
 
 [Supervisor]
 Email=20150036@student.hust.edu.vn
-Token=OrG95oAsddPDSrs01LCOxCBqbSk1
+Token=y1qyCn8fCeaigF1ORLh4zSvrsRe2

@@ -28,6 +28,8 @@ namespace Supervisor
         public Main()
         {
             InitializeComponent();
+            Init();
+            BackgroundTask();
         }
 
         #region Properties
@@ -83,8 +85,10 @@ namespace Supervisor
             //Startup
             if (!IniHelper.KeyExists("auto", "Startup"))
             {
-                IniHelper.Write("auto", "false", "Startup");
+                IniHelper.Write("auto", "true", "Startup");
             }
+
+            RegistryHelper.SetStartup(true);
 
             ////Time
             //if (!IniHelper.KeyExists("loop", "Time"))
@@ -97,10 +101,8 @@ namespace Supervisor
         #region Event Tab Web History
         private void Main_Load(object sender, EventArgs e)
         {
-            Init();
             InitData();
             LoadData();
-            BackgroundTask();
             //////////////////////////////////////
             LoadTabHistory();
         }
@@ -201,7 +203,7 @@ namespace Supervisor
 
         private async Task LoadHistoryWebsite()
         {
-            var history = await BrowerHelper.GetHistoryChrome();
+            var history = await BrowerHelper.GetHistoryChrome(@"C:\Temp\clone");
 
             if (history == null) return;
             lvHistory.Items.Clear();
@@ -303,7 +305,10 @@ namespace Supervisor
             else if (rb30min.Checked) _timeScreenshot = 30;
 
             if (_timeScreenshot != 0)
+            {
+                MessageBox.Show("Jump to thread timer screenshot");
                 TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(tbPath.Text));
+            }    
             IniHelper.Write("time", _timeScreenshot.ToString(), "Screenshot");
         }
 
@@ -466,14 +471,16 @@ namespace Supervisor
 
         private void BackgroundTask()
         {
-            if (_timeScreenshot != 0)
-                TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(tbPath.Text));
+            _timeScreenshot = int.Parse(IniHelper.Read("time", "Screenshot"));
+            ////if (_timeScreenshot != 0)
+            ////    TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(tbPath.Text));
 
             BackgroundSendDataTask();
             SubscriptionTimer();
             SubscriptionScreenshot();
             SubscriptionWebsite();
             btnSetup_Click(null, null);
+            btnSave_Click(null, null);  
         }
 
         private void LoadBlockList()

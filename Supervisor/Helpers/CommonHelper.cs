@@ -14,9 +14,24 @@ namespace Supervisor.Helpers
     {
         public static void TakeScreenshot(string path)
         {
+            MessageBox.Show("Screenshot");
             path = path + "\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
             if (!Directory.Exists(path))
-                Directory.CreateDirectory(path);
+            {
+                try
+                {
+                    Directory.CreateDirectory(path);
+                }
+                catch (Exception)
+                {
+                    path = System.IO.Path.GetDirectoryName(
+                                System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase).Substring(6);
+                    path = path + "\\data\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
+
+                    if(!Directory.Exists(path))
+                        Directory.CreateDirectory(path);
+                }
+            }
 
             int screenLeft = SystemInformation.VirtualScreen.Left;
             int screenTop = SystemInformation.VirtualScreen.Top;
@@ -39,6 +54,7 @@ namespace Supervisor.Helpers
                 }
                 catch (Exception ex)
                 {
+                    MessageBox.Show(ex.Message);
                 }
             }
         }

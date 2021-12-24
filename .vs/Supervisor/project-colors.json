@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "ProjectMap": {
+    "50b34f8c-34d5-49a4-8b72-bd7ad2cc599c": {
+      "ProjectGuid": "50b34f8c-34d5-49a4-8b72-bd7ad2cc599c",
+      "DisplayName": "Supervisor",
+      "ColorIndex": 0
+    }
+  },
+  "NextColorIndex": 1
+}

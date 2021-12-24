@@ -45,11 +45,11 @@ namespace Supervisor
                 var auth = await FirebaseAuth.SignInWithEmailAndPasswordAsync(email, pass);
                 var content = await auth.GetFreshAuthAsync();
                 var token = GetToken();
-                IniHelper.Write("Email", content.User.Email);
 
                 // chua co token
                 if (string.IsNullOrWhiteSpace(token))
                 {
+                    IniHelper.Write("Email", content.User.Email);
                     IniHelper.Write("Token", content.User.LocalId);
                     DialogResult = DialogResult.OK;
                 }

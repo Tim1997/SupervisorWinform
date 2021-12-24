@@ -18,32 +18,17 @@ namespace Supervisor.Helpers
         private static string _pUser = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         private static string _pChrome = _pUser + @"\Google\Chrome\User Data\Default\History";
         private static string source = @"C:\Users\ADMIN\AppData\Local\Google\Chrome\User Data\Default";
-        private static string _target = @"C:\Temp\History";
         #endregion
 
         #region Method
-        public static Task<List<HistoryItem>> GetHistoryChrome()
+        public static Task<List<HistoryItem>> GetHistoryChrome(string path = @"C:\Temp")
         {
-            //var lprocess = Process.GetProcessesByName("chrome");
-            //if(lprocess.Count() > 0)
-            //{
-            //    var result = MessageBox.Show("You must close all tab chrome to load history.\nDo you want to close any way?", "Information", MessageBoxButtons.OKCancel);
-
-            //    if (result == DialogResult.OK)
-            //    {
-            //        foreach (var process in lprocess)
-            //        {
-            //            process.Kill();
-            //        }
-            //    }
-            //    else return null;
-            //}
-
             try
             {
-                if (!Directory.Exists(@"C:\Temp"))
-                    Directory.CreateDirectory(@"C:\Temp");
+                if (!Directory.Exists(path))
+                    Directory.CreateDirectory(path);
 
+                var _target = path + @"\History";
                 if (File.Exists(_target)) 
                     File.Delete(_target);
 
