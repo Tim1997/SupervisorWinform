@@ -14,10 +14,21 @@ namespace Supervisor.Helpers
     {
         public static void TakeScreenshot(string path)
         {
-            MessageBox.Show("Screenshot");
-            path = path + "\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
+            //MessageBox.Show(path);
+            if (string.IsNullOrEmpty(path))
+            {
+                path = System.IO.Path.GetDirectoryName(
+                                System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase).Substring(6);
+                path = path + "\\data\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
+            } else
+                path = path + "\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
+
+            //MessageBox.Show(path);
+            //MessageBox.Show("Method take screenshot");
+            
             if (!Directory.Exists(path))
             {
+                MessageBox.Show(path);
                 try
                 {
                     Directory.CreateDirectory(path);
@@ -29,7 +40,10 @@ namespace Supervisor.Helpers
                     path = path + "\\data\\" + DateTime.Now.ToString("ddMMyyyy") + "\\";
 
                     if(!Directory.Exists(path))
+                    {
                         Directory.CreateDirectory(path);
+                        //MessageBox.Show(path);
+                    }    
                 }
             }
 
@@ -39,6 +53,7 @@ namespace Supervisor.Helpers
             int screenHeight = SystemInformation.VirtualScreen.Height;
 
             // Create a bitmap of the appropriate size to receive the screenshot.
+            MessageBox.Show("gen screenshot");
             using (Bitmap bitmap = new Bitmap(screenWidth, screenHeight))
             {
                 // Draw the screenshot into our bitmap.
@@ -51,11 +66,13 @@ namespace Supervisor.Helpers
                 try
                 {
                     bitmap.Save(uniqueFileName, ImageFormat.Png);
+                    //MessageBox.Show("save screenshot");
                 }
                 catch (Exception ex)
                 {
                     MessageBox.Show(ex.Message);
                 }
+                //MessageBox.Show("success done method");
             }
         }
     }

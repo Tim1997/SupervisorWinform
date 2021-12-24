@@ -292,7 +292,7 @@ namespace Supervisor
                 tbPath.Text = browse.SelectedPath;
             }
 
-            IniHelper.Write("path", tbPath.Text,"Screenshot");
+            IniHelper.Write("path", tbPath.Text, "Screenshot");
         }
 
         private void btnSave_Click(object sender, EventArgs ea)
@@ -306,9 +306,16 @@ namespace Supervisor
 
             if (_timeScreenshot != 0)
             {
-                MessageBox.Show("Jump to thread timer screenshot");
-                TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(tbPath.Text));
-            }    
+                //MessageBox.Show("Jump to thread timer screenshot");
+                var path = "";
+                if (!string.IsNullOrEmpty(tbPath.Text))
+                    path = tbPath.Text;
+                else
+                    path = IniHelper.Read("path", "Screenshot");
+
+                //MessageBox.Show(path);
+                TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(path));
+            }
             IniHelper.Write("time", _timeScreenshot.ToString(), "Screenshot");
         }
 
@@ -372,7 +379,7 @@ namespace Supervisor
                             rbOneTime.Checked = false;
 
                         await ShowToastAsync("Information", new[] { "Your computer will be shutdown" });
-                        Process.Start("shutdown", "/s /t 0");
+                        Process.Start("shutdown", "/s /f /t 0");
                         return;
                     }
 
@@ -472,15 +479,12 @@ namespace Supervisor
         private void BackgroundTask()
         {
             _timeScreenshot = int.Parse(IniHelper.Read("time", "Screenshot"));
-            ////if (_timeScreenshot != 0)
-            ////    TimerHelper.Run(_timeScreenshot, (s, e) => CommonHelper.TakeScreenshot(tbPath.Text));
-
             BackgroundSendDataTask();
             SubscriptionTimer();
             SubscriptionScreenshot();
             SubscriptionWebsite();
             btnSetup_Click(null, null);
-            btnSave_Click(null, null);  
+            btnSave_Click(null, null);
         }
 
         private void LoadBlockList()
@@ -662,14 +666,14 @@ namespace Supervisor
 
                             IniHelper.Write("loop", (!timer.IsOnce).ToString(), "Time");
                             IniHelper.Write("type", timer.IsClock ? "Clock" : "Countdown", "Time");
-                            
-                            if(timer.IsClock)
+
+                            if (timer.IsClock)
                                 IniHelper.Write("typetime", timer.Clock.ToString(), "Time");
                             else
                                 IniHelper.Write("typetime", timer.Minute.ToString(), "Time");
-                            
-                            this.Invoke(new Action(() => 
-                            { 
+
+                            this.Invoke(new Action(() =>
+                            {
                                 LoadDataTimer();
                                 btnSetup.PerformClick();
                             }));
@@ -708,10 +712,10 @@ namespace Supervisor
                                         return;
 
                                     IniHelper.Write("time", screenshot.Time.ToString(), "Screenshot");
-                                    this.Invoke(new Action(() => 
+                                    this.Invoke(new Action(() =>
                                     {
                                         LoadDataScreenshot();
-                                        btnSave.PerformClick(); 
+                                        btnSave.PerformClick();
                                     }));
                                 }
                                 break;
@@ -742,7 +746,7 @@ namespace Supervisor
                                     var website = evt.Object;
                                     if (website == null) return;
 
-                                    if(BlockWebsites?.Exists(x => x == website.Url) == false)
+                                    if (BlockWebsites?.Exists(x => x == website.Url) == false)
                                     {
                                         //add view
                                         BlockWebsites.Add(website.Url);

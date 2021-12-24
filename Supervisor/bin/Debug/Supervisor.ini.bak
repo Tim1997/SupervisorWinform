@@ -1,14 +1,10 @@
 [Screenshot]
 time=5
-path=F:\Trash
+path=C:\Users
 [Startup]
 auto=True
 
 [Time]
-loop=True
-type=Countdown
-typetime=0
+loop=true
+typetime=1
 
-[Supervisor]
-Email=20150036@student.hust.edu.vn
-Token=y1qyCn8fCeaigF1ORLh4zSvrsRe2

@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace Supervisor.Helpers
 {
@@ -22,7 +23,10 @@ namespace Supervisor.Helpers
 
         public IniHelper(string IniPath = null)
         {
-            Path = new FileInfo(IniPath ?? BaseConstant.EXE + ".ini").FullName;
+            var _pDebug = System.IO.Path.GetDirectoryName(
+                        System.Reflection.Assembly.GetExecutingAssembly().GetName().CodeBase).Substring(6);
+
+            Path = _pDebug + $"\\{Assembly.GetCallingAssembly().GetName().Name}.ini";
         }
 
         public string Read(string Key, string Section = null)
